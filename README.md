@@ -84,12 +84,19 @@ You'll need, before starting:
    name), then upgrade it to **Blaze** under Project settings → Usage and
    billing. Blaze is pay-as-you-go but includes the same free tier as the
    Spark plan — a personal instance of this app (a handful of calls a day)
-   is expected to stay within it. It just requires a card on file.
+   is expected to stay within it. It just requires a card on file. (A
+   Firebase project is a Google Cloud project underneath, so this is the
+   only "GCP project" step — there's nothing separate to create in the GCP
+   console itself.)
 2. **An Anthropic API key with billing set up** at
    [console.anthropic.com](https://console.anthropic.com/settings/billing) —
    this is separate from any claude.ai (Pro/Max) subscription, which does
    *not* cover API usage. See [Cost](#cost) below for what to expect.
-3. **Node.js 20+** and the Firebase CLI: `npm install -g firebase-tools`,
+3. **The Google account you'll sign in with.** No account to create — just
+   decide which existing Google account (personal Gmail, etc.) should be the
+   one allowed to use your deployment. Its email is what you'll enter as
+   `ALLOWED_EMAIL` during setup; see [Access control](#access-control).
+4. **Node.js 20+** and the Firebase CLI: `npm install -g firebase-tools`,
    then `firebase login`.
 
 Then, from the cloned repo:
