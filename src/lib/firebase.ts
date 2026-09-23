@@ -53,6 +53,8 @@ export type Story = {
   summary: string;
   source: string;
   url: string;
+  /** YYYY-MM-DD, or "" when Claude's research couldn't pin one down. */
+  publishedDate: string;
   category:
     | "model-release"
     | "research"
@@ -65,10 +67,24 @@ export type Story = {
 
 export type Tone = "professional" | "conversational" | "analytical";
 
+type DigestResult = {
+  date: string;
+  cached: boolean;
+  stories: Story[];
+  /** ISO timestamp of when this digest was fetched, or null if never. */
+  fetchedAt: string | null;
+};
+
 export const getDigest = httpsCallable<
   { date?: string; refresh?: boolean },
-  { date: string; cached: boolean; stories: Story[] }
+  DigestResult
 >(functions, "getDigest");
+
+/** Reads the most recent digest ever fetched, at no cost -- never calls Claude. */
+export const getLatestDigest = httpsCallable<
+  Record<string, never>,
+  { date: string | null; stories: Story[]; fetchedAt: string | null }
+>(functions, "getLatestDigest");
 
 export const createLinkedInPost = httpsCallable<
   { story: Story; tone: Tone },

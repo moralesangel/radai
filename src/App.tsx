@@ -1,5 +1,11 @@
 import { useState, useCallback, useEffect } from "react";
-import { getDigest, onAuthChange, signOut, type Story } from "./lib/firebase";
+import {
+  getDigest,
+  getLatestDigest,
+  onAuthChange,
+  signOut,
+  type Story,
+} from "./lib/firebase";
 import { describeError } from "./lib/errors";
 import { StoryCard } from "./components/StoryCard";
 import { PostComposer } from "./components/PostComposer";
@@ -13,22 +19,54 @@ function localTodayISO(): string {
   return new Date(d.getTime() - offsetMs).toISOString().slice(0, 10);
 }
 
-type Status = "idle" | "loading" | "loaded" | "error";
+/** "22 Sep, 14:03" in the visitor's own locale and timezone. */
+function formatTimestamp(iso: string): string {
+  return new Date(iso).toLocaleString(undefined, {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+type Status = "idle" | "restoring" | "loading" | "loaded" | "error";
 
 export default function App() {
   // undefined = auth state not yet known (initial load); null = signed out.
   const [user, setUser] = useState<User | null | undefined>(undefined);
-  const [status, setStatus] = useState<Status>("idle");
+  const [status, setStatus] = useState<Status>("restoring");
   const [stories, setStories] = useState<Story[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [cached, setCached] = useState(false);
+  const [fetchedAt, setFetchedAt] = useState<string | null>(null);
   const [selected, setSelected] = useState<Story | null>(null);
 
   useEffect(() => onAuthChange(setUser), []);
 
-  // Nothing fetches on page load -- searching costs money (Claude web search
-  // + tokens), so it only runs when the user explicitly asks for it. A cache
-  // hit for today's date is still free to re-check.
+  // Restoring the last search is free (it only reads Firestore, never calls
+  // Claude), so this runs automatically once signed in -- closing and
+  // reopening the app shows what you last found, not a blank slate.
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    getLatestDigest({})
+      .then((result) => {
+        if (cancelled) return;
+        if (result.data.stories.length > 0) {
+          setStories(result.data.stories);
+          setFetchedAt(result.data.fetchedAt);
+          setStatus("loaded");
+        } else {
+          setStatus("idle");
+        }
+      })
+      .catch(() => !cancelled && setStatus("idle"));
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  // A *new* search costs money (Claude web search + tokens), so it only runs
+  // on an explicit press -- never automatically.
   const search = useCallback(async (refresh = false) => {
     setStatus("loading");
     setError(null);
@@ -36,7 +74,7 @@ export default function App() {
     try {
       const result = await getDigest({ date: localTodayISO(), refresh });
       setStories(result.data.stories);
-      setCached(result.data.cached);
+      setFetchedAt(result.data.fetchedAt);
       setStatus("loaded");
     } catch (err) {
       setError(describeError(err, "Could not load the digest."));
@@ -46,7 +84,7 @@ export default function App() {
   }, []);
 
   if (user === undefined) {
-    return <div className="min-h-screen bg-slate-50" />;
+    return <div style={{ background: "var(--bg)" }} className="min-h-screen" />;
   }
 
   if (user === null) {
@@ -54,20 +92,32 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-4 sm:px-6">
-          <div>
-            <h1 className="text-lg font-semibold text-slate-900">radai</h1>
-            <p className="text-sm text-slate-500">The most relevant AI news, on demand</p>
-          </div>
+    <div className="min-h-screen" style={{ background: "var(--bg)" }}>
+      <header
+        className="border-b"
+        style={{ borderColor: "var(--rule-strong)", background: "var(--surface)" }}
+      >
+        <div className="mx-auto flex max-w-2xl flex-wrap items-baseline gap-x-4 gap-y-2 px-5 py-6 sm:px-8">
+          <h1
+            className="font-display text-3xl font-medium tracking-tight"
+            style={{ color: "var(--ink)" }}
+          >
+            radai
+          </h1>
+          <p
+            className="text-[13px] uppercase tracking-[0.14em]"
+            style={{ color: "var(--ink-faint)" }}
+          >
+            The most significant AI news, on demand
+          </p>
 
-          <div className="ml-auto flex shrink-0 items-center gap-2">
+          <div className="ml-auto flex items-center gap-4 text-sm">
             {status === "loaded" && (
               <button
                 type="button"
                 onClick={() => void search(true)}
-                className="rounded bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700"
+                className="font-medium underline decoration-1 underline-offset-4 transition-opacity hover:opacity-70"
+                style={{ color: "var(--accent)" }}
               >
                 Search again
               </button>
@@ -75,7 +125,8 @@ export default function App() {
             <button
               type="button"
               onClick={() => void signOut()}
-              className="text-sm text-slate-400 hover:text-slate-600"
+              className="transition-opacity hover:opacity-70"
+              style={{ color: "var(--ink-faint)" }}
             >
               Sign out
             </button>
@@ -83,40 +134,63 @@ export default function App() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-3xl space-y-4 px-4 py-6 sm:px-6">
+      <main className="mx-auto max-w-2xl px-5 py-8 sm:px-8">
         {selected && (
-          <PostComposer story={selected} onClose={() => setSelected(null)} />
+          <div className="mb-8">
+            <PostComposer story={selected} onClose={() => setSelected(null)} />
+          </div>
+        )}
+
+        {(status === "restoring" || status === "loading") && (
+          <div className="flex flex-col items-center gap-3 py-24 text-center">
+            <div
+              className="h-5 w-5 animate-spin rounded-full border-2 border-transparent"
+              style={{ borderTopColor: "var(--accent)", borderRightColor: "var(--rule-strong)" }}
+            />
+            <p className="text-sm" style={{ color: "var(--ink-dim)" }}>
+              {status === "restoring"
+                ? "Loading your last search…"
+                : "Searching the web for recent AI news. This takes a minute."}
+            </p>
+          </div>
         )}
 
         {status === "idle" && (
-          <div className="flex flex-col items-center gap-4 py-16 text-center">
-            <p className="max-w-sm text-slate-500">
-              Search the web for the most significant AI news from the last
-              couple of days. Each search uses your Anthropic API credit.
+          <div className="flex flex-col items-center gap-5 py-20 text-center">
+            <p
+              className="max-w-sm font-display text-xl leading-snug"
+              style={{ color: "var(--ink)" }}
+            >
+              Find what actually happened in AI this week.
+            </p>
+            <p className="max-w-xs text-sm" style={{ color: "var(--ink-dim)" }}>
+              Each search uses your Anthropic API credit, so nothing runs until
+              you ask for it.
             </p>
             <button
               type="button"
               onClick={() => void search(false)}
-              className="rounded bg-slate-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-slate-700"
+              className="mt-2 px-6 py-3 text-sm font-medium tracking-wide text-white transition-opacity hover:opacity-90"
+              style={{ background: "var(--accent)" }}
             >
               Search for AI news
             </button>
           </div>
         )}
 
-        {status === "loading" && (
-          <p className="py-12 text-center text-slate-500">
-            Searching the web for recent AI news. This takes a minute.
-          </p>
-        )}
-
         {status === "error" && error && (
-          <div className="space-y-3">
-            <p className="rounded bg-red-50 p-3 text-sm text-red-700">{error}</p>
+          <div
+            className="space-y-3 border-l-2 py-1 pl-4"
+            style={{ borderColor: "var(--danger)" }}
+          >
+            <p className="text-sm" style={{ color: "var(--danger)" }}>
+              {error}
+            </p>
             <button
               type="button"
               onClick={() => void search(false)}
-              className="rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
+              className="text-sm font-medium underline decoration-1 underline-offset-4"
+              style={{ color: "var(--accent)" }}
             >
               Try again
             </button>
@@ -124,12 +198,15 @@ export default function App() {
         )}
 
         {status === "loaded" && stories.length === 0 && (
-          <div className="space-y-3 py-12 text-center text-slate-500">
-            <p>No significant AI news found in the last couple of days.</p>
+          <div className="space-y-4 py-20 text-center">
+            <p className="text-sm" style={{ color: "var(--ink-dim)" }}>
+              No significant AI news found in the last week.
+            </p>
             <button
               type="button"
               onClick={() => void search(true)}
-              className="rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
+              className="px-5 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
+              style={{ background: "var(--accent)" }}
             >
               Search again
             </button>
@@ -138,17 +215,25 @@ export default function App() {
 
         {status === "loaded" && stories.length > 0 && (
           <>
-            <p className="text-xs text-slate-400">
-              {stories.length} stories{cached ? " · already searched today" : ""}
-            </p>
-            {stories.map((story) => (
-              <StoryCard
-                key={story.url}
-                story={story}
-                selected={selected?.url === story.url}
-                onSelect={() => setSelected(story)}
-              />
-            ))}
+            <div
+              className="mb-6 flex items-baseline justify-between border-b pb-3 text-[13px]"
+              style={{ borderColor: "var(--rule)", color: "var(--ink-faint)" }}
+            >
+              <span>
+                {stories.length} {stories.length === 1 ? "story" : "stories"}
+              </span>
+              {fetchedAt && <span>Searched {formatTimestamp(fetchedAt)}</span>}
+            </div>
+            <div className="divide-y divide-[var(--rule)]">
+              {stories.map((story) => (
+                <StoryCard
+                  key={story.url}
+                  story={story}
+                  selected={selected?.url === story.url}
+                  onSelect={() => setSelected(story)}
+                />
+              ))}
+            </div>
           </>
         )}
       </main>

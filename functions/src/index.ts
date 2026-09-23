@@ -109,7 +109,13 @@ export const getDigest = onCall(runtime, async (request) => {
   if (!refresh) {
     const cached = await docRef.get();
     if (cached.exists) {
-      return { date, cached: true, stories: cached.data()?.stories ?? [] };
+      const data = cached.data();
+      return {
+        date,
+        cached: true,
+        stories: data?.stories ?? [],
+        fetchedAt: data?.fetchedAt?.toDate?.().toISOString() ?? null,
+      };
     }
   }
 
@@ -121,13 +127,39 @@ export const getDigest = onCall(runtime, async (request) => {
     throw new HttpsError("internal", describeClaudeError(err));
   }
 
-  await docRef.set({
-    date,
-    stories,
-    fetchedAt: FieldValue.serverTimestamp(),
-  });
+  const fetchedAt = FieldValue.serverTimestamp();
+  await docRef.set({ date, stories, fetchedAt });
+  // A separate pointer to "whichever search ran most recently", regardless of
+  // date -- lets the app restore what you last saw on reopening without
+  // scanning the digests collection or running a new search to find out.
+  await db.collection("meta").doc("latestDigest").set({ date, fetchedAt });
 
-  return { date, cached: false, stories };
+  return { date, cached: false, stories, fetchedAt: new Date().toISOString() };
+});
+
+/**
+ * Returns whatever digest was fetched most recently, however long ago,
+ * without ever calling Claude. Used to restore the app's last view on
+ * reopening -- reading a cache is free, so this runs automatically, unlike
+ * getDigest which only runs on an explicit search.
+ */
+export const getLatestDigest = onCall(runtime, async (request) => {
+  requireOwner(request);
+
+  const pointer = await db.collection("meta").doc("latestDigest").get();
+  if (!pointer.exists) {
+    return { date: null, stories: [], fetchedAt: null };
+  }
+
+  const { date } = pointer.data() as { date: string };
+  const digest = await db.collection("digests").doc(date).get();
+  const data = digest.data();
+
+  return {
+    date,
+    stories: data?.stories ?? [],
+    fetchedAt: data?.fetchedAt?.toDate?.().toISOString() ?? null,
+  };
 });
 
 const TONES: PostTone[] = ["professional", "conversational", "analytical"];

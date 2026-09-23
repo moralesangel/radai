@@ -21,6 +21,11 @@ export const StorySchema = z.object({
   summary: z.string(),
   source: z.string(),
   url: z.string(),
+  // YYYY-MM-DD when Claude's research reports one; "" when a story's exact
+  // date wasn't recoverable from what it found (rare but real -- some
+  // sources don't surface a clear publish date). The frontend shows a
+  // fallback label for the empty case rather than a fake date.
+  publishedDate: z.string(),
   category: z.enum([
     "model-release",
     "research",
@@ -130,6 +135,9 @@ Rules:
 - "significance" is 1-10, where 10 is a landmark event for the field.
 - "url" must be the real article URL from the research. Never invent one.
 - "source" is the publication name, e.g. "TechCrunch".
+- "publishedDate" is the story's actual publication date as YYYY-MM-DD, taken
+  from the research. Use "" only if the research genuinely doesn't state or
+  imply a date for that story -- never guess or default to today.
 - Order by significance, highest first.
 
 Research:

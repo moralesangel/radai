@@ -1,1 +1,67 @@
 @import "tailwindcss";
+
+/*
+ * "Editorial bulletin" system: warm paper ground, ink-blue accent, a serif
+ * display face for headlines paired with a humanist sans for body/meta text.
+ * Deliberately not the warm-cream-plus-terracotta look that's become the
+ * generic "AI app" default -- the palette below uses its own hue for both
+ * ground and accent.
+ */
+:root {
+  --bg: #faf7f1;
+  --surface: #ffffff;
+  --ink: #211d17;
+  --ink-dim: #6d6656;
+  --ink-faint: #a39a86;
+  --rule: #e6dfd0;
+  --rule-strong: #cfc5ae;
+  --accent: #29456b;
+  --accent-soft: #eef2f7;
+  --accent-ink: #1a2e47;
+  --danger: #8a2e22;
+  --danger-soft: #fbeeec;
+
+  font-family: "Source Sans 3", ui-sans-serif, system-ui, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #17140f;
+    --surface: #201c15;
+    --ink: #f3efe6;
+    --ink-dim: #b3a892;
+    --ink-faint: #7d735d;
+    --rule: #352f24;
+    --rule-strong: #4a4131;
+    --accent: #7fa1cc;
+    --accent-soft: #212a35;
+    --accent-ink: #cfe0f2;
+    --danger: #e5897a;
+    --danger-soft: #3a221d;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #17140f;
+  --surface: #201c15;
+  --ink: #f3efe6;
+  --ink-dim: #b3a892;
+  --ink-faint: #7d735d;
+  --rule: #352f24;
+  --rule-strong: #4a4131;
+  --accent: #7fa1cc;
+  --accent-soft: #212a35;
+  --accent-ink: #cfe0f2;
+  --danger: #e5897a;
+  --danger-soft: #3a221d;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+}
+
+.font-display {
+  font-family: "Fraunces", ui-serif, Georgia, serif;
+  font-optical-sizing: auto;
+}

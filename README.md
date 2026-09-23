@@ -7,17 +7,22 @@ cache).
 
 ## How it works
 
-1. **News discovery is user-triggered, not scheduled.** Opening the app does
-   nothing by itself — the visitor presses "Search for AI news", which calls a
-   Cloud Function that asks Claude (with the `web_search` server tool) for the
-   most significant AI news from the last 7 days, then makes a second
-   structured-outputs call to normalize the results into typed JSON
-   (`{ title, summary, source, url, category, significance }`), capped at the
-   8 most significant stories. There's no cron job spending your Anthropic
-   credit on days you don't open the app.
-2. **Caching** — results are cached in Firestore keyed by the visitor's local
-   calendar date, so pressing the button again the same day is free. A
-   "Search again" button forces a real re-fetch.
+1. **News discovery is user-triggered, not scheduled.** Opening the app
+   doesn't run a new search — it restores whatever you found last time (see
+   below). Pressing "Search for AI news" calls a Cloud Function that asks
+   Claude (with the `web_search` server tool) for the most significant AI
+   news from the last 7 days, then makes a second structured-outputs call to
+   normalize the results into typed JSON
+   (`{ title, summary, source, url, publishedDate, category, significance }`),
+   capped at the 8 most significant stories. There's no cron job spending
+   your Anthropic credit on days you don't ask for a search.
+2. **Caching and restoring** — each search is cached in Firestore keyed by
+   the visitor's local calendar date, so pressing "Search again" the same
+   day is the only way to spend more credit that day. Separately, a pointer
+   to the most recent search ever run (`getLatestDigest`, a read-only,
+   Claude-free call) is what the app loads automatically on open — so
+   closing the app and coming back later shows the same stories you last
+   saw, with the timestamp of when that search ran, until you search again.
 3. **LinkedIn drafting** — selecting a story calls a second Cloud Function
    that asks Claude to draft a post in one of three tones. The result is
    editable and copies to the clipboard — nothing is posted to LinkedIn
@@ -42,7 +47,9 @@ else spend your Anthropic credit.
 
 ## Stack
 
-- **Frontend:** React 19 + TypeScript + Vite + Tailwind CSS
+- **Frontend:** React 19 + TypeScript + Vite + Tailwind CSS, custom editorial
+  theme (Fraunces + Source Sans, warm-paper palette) defined as CSS custom
+  properties in `src/index.css` with light/dark variants
 - **Backend:** Firebase Cloud Functions (2nd gen, Node 22)
 - **Data:** Firestore (cache for digests + generated posts)
 - **LLM:** Claude (`claude-haiku-4-5`) via `@anthropic-ai/sdk`, using the
@@ -157,8 +164,8 @@ src/                     React app
 
 functions/src/
   claude.ts               Claude calls: web search digest, LinkedIn drafting
-  index.ts                Cloud Functions: getDigest, createLinkedInPost,
-                           requireOwner (the ALLOWED_EMAIL check)
+  index.ts                Cloud Functions: getDigest, getLatestDigest,
+                           createLinkedInPost, requireOwner (ALLOWED_EMAIL check)
 ```
 
 ## Notes / things you may want to change

@@ -20,20 +20,33 @@ export function SignIn() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-slate-50 px-4 text-center">
-      <h1 className="text-lg font-semibold text-slate-900">radai</h1>
-      <p className="max-w-xs text-sm text-slate-500">
+    <div
+      className="flex min-h-screen flex-col items-center justify-center gap-5 px-6 text-center"
+      style={{ background: "var(--bg)" }}
+    >
+      <h1
+        className="font-display text-4xl font-medium tracking-tight"
+        style={{ color: "var(--ink)" }}
+      >
+        radai
+      </h1>
+      <p className="max-w-xs text-sm" style={{ color: "var(--ink-dim)" }}>
         This app is restricted to its owner's Google account.
       </p>
       <button
         type="button"
         onClick={() => void handleSignIn()}
         disabled={loading}
-        className="rounded bg-slate-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
+        className="px-6 py-3 text-sm font-medium tracking-wide text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+        style={{ background: "var(--accent)" }}
       >
-        {loading ? "Signing in..." : "Sign in with Google"}
+        {loading ? "Signing in…" : "Sign in with Google"}
       </button>
-      {error && <p className="max-w-xs text-sm text-red-700">{error}</p>}
+      {error && (
+        <p className="max-w-xs text-sm" style={{ color: "var(--danger)" }}>
+          {error}
+        </p>
+      )}
     </div>
   );
 }
