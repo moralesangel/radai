@@ -144,6 +144,37 @@ echo "VITE_USE_EMULATOR=true" >> .env
 npm run dev
 ```
 
+### A shorter Hosting URL
+
+By default your app lives at `https://<your-project-id>.web.app`, which
+often carries an auto-generated suffix (Firebase project IDs are globally
+unique, so `radai` alone may already be taken — this deployment's project is
+`radia-889ee`, for instance). If you'd rather have a clean name like
+`https://your-name.web.app`, Firebase Hosting supports multiple named
+"sites" per project, independent of the project ID:
+
+```bash
+firebase hosting:sites:create your-name --project your-project-id
+```
+
+Then deploy to it with a personal config override (kept local, never
+committed — everyone else keeps deploying with the plain `firebase deploy`
+above, so this is opt-in and doesn't affect them):
+
+```bash
+node -e "
+const fs = require('fs');
+const cfg = JSON.parse(fs.readFileSync('firebase.json', 'utf8'));
+cfg.hosting.site = 'your-name';
+fs.writeFileSync('firebase.personal.json', JSON.stringify(cfg, null, 2));
+"
+firebase deploy --only hosting -c firebase.personal.json
+```
+
+(Functions and Firestore still deploy the normal way; only Hosting has a
+separate site name.) For a fully custom domain instead of `*.web.app`, see
+[Firebase's custom domain docs](https://firebase.google.com/docs/hosting/custom-domain).
+
 ### Updating an existing deploy
 
 Made code changes and want them live? Just `firebase deploy` again — no need

@@ -27,6 +27,11 @@ pglite-debug.log
 # locally. Tracked only as .firebaserc.example, a placeholder.
 .firebaserc
 
+# Optional per-deployer override (e.g. a custom Hosting site name via
+# `-c firebase.personal.json`). Never shared -- everyone else deploys with
+# the plain `firebase deploy`/firebase.json above.
+firebase.personal.json
+
 # Editor / OS
 .vscode/*
 !.vscode/extensions.json
