@@ -96,7 +96,7 @@ async function runWithWebSearch(
  */
 export async function fetchDigest(
   throughDateISO: string,
-  windowDays = 2,
+  windowDays = 7,
   maxStories = 8,
 ): Promise<Story[]> {
   const research = await runWithWebSearch(
@@ -105,8 +105,8 @@ ${windowDays} days, up to and including ${throughDateISO}.
 
 Search the web for AI news from that window. Cover model releases, research
 papers, funding rounds, product launches, and AI policy -- but use your searches
-economically: 2-4 well-chosen queries is normally enough to cover these
-categories, so don't spend a search confirming something you're already
+economically: 3-5 well-chosen queries is normally enough to cover a week across
+these categories, so don't spend a search confirming something you're already
 confident about.
 
 For each story report: headline, 2-3 sentence summary, publication name, the URL,
@@ -114,7 +114,7 @@ the publication date, and why it matters. Only include stories actually
 published within that window. Favor genuinely significant developments over
 routine updates -- report at most the ${maxStories} most significant stories
 you find, and fewer if that's all there is.`,
-    5,
+    6,
   );
 
   const parsed = await getClient().messages.parse({

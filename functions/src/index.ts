@@ -57,7 +57,7 @@ function todayUTCISO(): string {
 }
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-const WINDOW_DAYS = 2;
+const WINDOW_DAYS = 7;
 const MAX_STORIES = 8;
 
 /**

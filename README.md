@@ -10,7 +10,7 @@ cache).
 1. **News discovery is user-triggered, not scheduled.** Opening the app does
    nothing by itself — the visitor presses "Search for AI news", which calls a
    Cloud Function that asks Claude (with the `web_search` server tool) for the
-   most significant AI news from the last 2 days, then makes a second
+   most significant AI news from the last 7 days, then makes a second
    structured-outputs call to normalize the results into typed JSON
    (`{ title, summary, source, url, category, significance }`), capped at the
    8 most significant stories. There's no cron job spending your Anthropic
@@ -49,10 +49,11 @@ API usage; the API needs its own billing at
 
 Each digest fetch makes 2 Claude calls (web search + JSON normalization);
 each LinkedIn post is 1 short call. Web search itself is billed per search
-performed (up to 5 per fetch, though the prompt asks Claude to use 2-4
-normally) on top of token cost. With `claude-haiku-4-5` and one digest fetch
-per day, expect roughly **$2–$4/month** — most of that is the search tool, not
-model tokens, so it doesn't drop much further by changing `MODEL`. Since
+performed (up to 6 per fetch, though the prompt asks Claude to use 3-5
+normally to cover a week) on top of token cost. With `claude-haiku-4-5` and
+one digest fetch per day, expect roughly **$2.50–$5/month** — most of that is
+the search tool, not model tokens, so it doesn't drop much further by
+changing `MODEL`. Since
 fetching is user-triggered rather than scheduled, days you don't open the app
 cost nothing. Switching `MODEL` to `claude-sonnet-5` or `claude-opus-5` raises
 research/writing quality but adds meaningfully to the token portion of the
