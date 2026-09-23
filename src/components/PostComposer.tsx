@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { createLinkedInPost, type Story, type Tone } from "../lib/firebase";
+import { describeError } from "../lib/errors";
 
 const TONES: { value: Tone; label: string }[] = [
   { value: "professional", label: "Professional" },
@@ -27,7 +28,7 @@ export function PostComposer({
       const result = await createLinkedInPost({ story, tone });
       setContent(result.data.content);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not generate the post.");
+      setError(describeError(err, "Could not generate the post."));
     } finally {
       setLoading(false);
     }

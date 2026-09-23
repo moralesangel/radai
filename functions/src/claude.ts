@@ -2,7 +2,12 @@ import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 
-const MODEL = "claude-opus-5";
+// Haiku 4.5 keeps this app's cost near-zero for a once-a-day digest fetch.
+// Two tradeoffs versus Opus/Sonnet, both handled below:
+// - Haiku uses `thinking: { type: "enabled", budget_tokens }`, not adaptive.
+// - Haiku doesn't support the newer web_search_20260209 tool variant, so we
+//   use the basic web_search_20250305 tool instead.
+const MODEL = "claude-haiku-4-5";
 
 /** Lazily constructed so a missing key fails at call time, not at module load. */
 let client: Anthropic | null = null;
@@ -55,9 +60,9 @@ async function runWithWebSearch(
     const response = await anthropic.messages.create({
       model: MODEL,
       max_tokens: 16000,
-      thinking: { type: "adaptive" },
+      thinking: { type: "enabled", budget_tokens: 4000 },
       tools: [
-        { type: "web_search_20260209", name: "web_search", max_uses: maxSearches },
+        { type: "web_search_20250305", name: "web_search", max_uses: maxSearches },
       ],
       messages,
     });
@@ -141,7 +146,7 @@ export async function generateLinkedInPost(
   const response = await getClient().messages.create({
     model: MODEL,
     max_tokens: 4000,
-    thinking: { type: "adaptive" },
+    thinking: { type: "enabled", budget_tokens: 2000 },
     system: `You write LinkedIn posts about AI news for a technical professional.
 
 Constraints:

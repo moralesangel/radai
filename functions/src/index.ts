@@ -2,8 +2,41 @@ import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
+import Anthropic from "@anthropic-ai/sdk";
 import { fetchDigest, generateLinkedInPost, StorySchema } from "./claude.js";
 import type { PostTone } from "./claude.js";
+
+/**
+ * Turns a Claude API failure into a message that's actually useful on the
+ * frontend, instead of a bare "internal" 500. Logs the raw error either way.
+ */
+function describeClaudeError(err: unknown): string {
+  if (err instanceof Anthropic.AuthenticationError) {
+    return "The Anthropic API key is missing or invalid. Update the ANTHROPIC_API_KEY secret and redeploy the functions.";
+  }
+  if (err instanceof Anthropic.PermissionDeniedError) {
+    return "The Anthropic API key does not have permission for this request (check plan/org access).";
+  }
+  if (err instanceof Anthropic.RateLimitError) {
+    return "Anthropic rate limit reached. Wait a moment and try again.";
+  }
+  if (err instanceof Anthropic.APIConnectionError) {
+    return "Could not reach the Anthropic API (network issue from the function). Try again shortly.";
+  }
+  if (err instanceof Anthropic.InternalServerError) {
+    return "Anthropic's API is temporarily overloaded or having an outage. Try again shortly.";
+  }
+  if (err instanceof Anthropic.BadRequestError) {
+    return `The request to Claude was rejected: ${err.message}`;
+  }
+  if (err instanceof Anthropic.APIError) {
+    return `Claude API error (${err.status ?? "unknown status"}): ${err.message}`;
+  }
+  if (err instanceof Error) {
+    return err.message;
+  }
+  return "An unexpected error occurred.";
+}
 
 initializeApp();
 const db = getFirestore();
@@ -53,7 +86,7 @@ export const getDigest = onCall(runtime, async (request) => {
     stories = await fetchDigest(date);
   } catch (err) {
     console.error("digest fetch failed", { date, err });
-    throw new HttpsError("internal", "Could not fetch the news digest.");
+    throw new HttpsError("internal", describeClaudeError(err));
   }
 
   await docRef.set({
@@ -84,7 +117,7 @@ export const createLinkedInPost = onCall(runtime, async (request) => {
     content = await generateLinkedInPost(parsedStory.data, tone);
   } catch (err) {
     console.error("post generation failed", err);
-    throw new HttpsError("internal", "Could not generate the post.");
+    throw new HttpsError("internal", describeClaudeError(err));
   }
 
   const doc = await db.collection("posts").add({

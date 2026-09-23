@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { getDigest, type Story } from "./lib/firebase";
+import { describeError } from "./lib/errors";
 import { StoryCard } from "./components/StoryCard";
 import { PostComposer } from "./components/PostComposer";
 
@@ -26,7 +27,7 @@ export default function App() {
       setStories(result.data.stories);
       setCached(result.data.cached);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load the digest.");
+      setError(describeError(err, "Could not load the digest."));
       setStories([]);
     } finally {
       setLoading(false);

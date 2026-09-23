@@ -27,8 +27,25 @@ reads/writes are denied by `firestore.rules`.
 - **Frontend:** React 19 + TypeScript + Vite + Tailwind CSS
 - **Backend:** Firebase Cloud Functions (2nd gen, Node 22)
 - **Data:** Firestore (cache for digests + generated posts)
-- **LLM:** Claude (`claude-opus-5`) via `@anthropic-ai/sdk`, using the
-  `web_search` server tool and `output_config.format` structured outputs
+- **LLM:** Claude (`claude-haiku-4-5`) via `@anthropic-ai/sdk`, using the
+  `web_search` server tool and `output_config.format` structured outputs.
+  Haiku keeps a once-a-day digest fetch cheap (see Cost below); swap `MODEL`
+  in `functions/src/claude.ts` for `claude-sonnet-5` or `claude-opus-5` if you
+  want stronger research/writing and don't mind the higher per-token cost.
+
+## Cost
+
+Firebase stays within the free tier for this usage pattern (a handful of
+function calls and Firestore reads/writes a day) — the real cost is Claude API
+usage, billed separately from any claude.ai subscription (Pro/Max don't cover
+API usage; the API needs its own billing at
+[console.anthropic.com](https://console.anthropic.com/settings/billing)).
+
+Each digest fetch makes 2 Claude calls (web search + JSON normalization);
+each LinkedIn post is 1 short call. With `claude-haiku-4-5` ($1/$5 per MTok)
+and one digest fetch per day, expect roughly **$0.50–$1.50/month**. Switching
+`MODEL` to `claude-sonnet-5` or `claude-opus-5` raises quality but multiplies
+cost several times over — check current pricing before switching.
 
 ## Setup
 
