@@ -105,11 +105,17 @@ export const getDigest = onCall(runtime, async (request) => {
   const refresh = request.data?.refresh === true;
 
   const docRef = db.collection("digests").doc(date);
+  const latestRef = db.collection("meta").doc("latestDigest");
 
   if (!refresh) {
     const cached = await docRef.get();
     if (cached.exists) {
       const data = cached.data();
+      // Keep the "most recent search" pointer current even on a cache hit --
+      // it should point at the most recently *viewed* digest, not only the
+      // most recently *computed* one, or reopening the app after a cached
+      // view (no new Claude call) would restore stale or no results.
+      await latestRef.set({ date, fetchedAt: data?.fetchedAt ?? null });
       return {
         date,
         cached: true,
@@ -132,7 +138,7 @@ export const getDigest = onCall(runtime, async (request) => {
   // A separate pointer to "whichever search ran most recently", regardless of
   // date -- lets the app restore what you last saw on reopening without
   // scanning the digests collection or running a new search to find out.
-  await db.collection("meta").doc("latestDigest").set({ date, fetchedAt });
+  await latestRef.set({ date, fetchedAt });
 
   return { date, cached: false, stories, fetchedAt: new Date().toISOString() };
 });

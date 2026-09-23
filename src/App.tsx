@@ -59,7 +59,15 @@ export default function App() {
           setStatus("idle");
         }
       })
-      .catch(() => !cancelled && setStatus("idle"));
+      .catch((err) => {
+        if (cancelled) return;
+        // Restoring silently falling back to "idle" hid real failures (auth
+        // token races, a missing function, etc.) behind what looked like an
+        // empty history. Surface it instead of guessing.
+        console.error("getLatestDigest failed", err);
+        setError(describeError(err, "Could not load your last search."));
+        setStatus("error");
+      });
     return () => {
       cancelled = true;
     };
