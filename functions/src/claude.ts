@@ -86,26 +86,34 @@ async function runWithWebSearch(
 }
 
 /**
- * Finds AI news published on `dateISO` (YYYY-MM-DD) and returns it as
- * structured stories.
+ * Finds the most significant AI news from the `windowDays` days up to and
+ * including `throughDateISO` (YYYY-MM-DD, the caller's "today"), and returns
+ * up to `maxStories` as structured stories, most significant first.
  *
  * Two passes on purpose: structured outputs and server tools don't combine
  * cleanly, so pass 1 searches freely and pass 2 normalizes that prose into
  * schema-valid JSON.
  */
-export async function fetchDigest(dateISO: string): Promise<Story[]> {
+export async function fetchDigest(
+  throughDateISO: string,
+  windowDays = 2,
+  maxStories = 8,
+): Promise<Story[]> {
   const research = await runWithWebSearch(
-    `Find the most significant artificial intelligence news published on ${dateISO}.
+    `Find the most significant artificial intelligence news from the last
+${windowDays} days, up to and including ${throughDateISO}.
 
-Search the web for AI news from that specific date. Cover model releases, research
+Search the web for AI news from that window. Cover model releases, research
 papers, funding rounds, product launches, and AI policy -- but use your searches
 economically: 2-4 well-chosen queries is normally enough to cover these
 categories, so don't spend a search confirming something you're already
 confident about.
 
 For each story report: headline, 2-3 sentence summary, publication name, the URL,
-and why it matters. Only include stories actually published on ${dateISO}. If you
-find fewer than five, report only what you found rather than padding the list.`,
+the publication date, and why it matters. Only include stories actually
+published within that window. Favor genuinely significant developments over
+routine updates -- report at most the ${maxStories} most significant stories
+you find, and fewer if that's all there is.`,
     5,
   );
 
@@ -118,6 +126,7 @@ find fewer than five, report only what you found rather than padding the list.`,
         content: `Convert this AI news research into structured JSON.
 
 Rules:
+- Include at most ${maxStories} stories -- the most significant ones.
 - "significance" is 1-10, where 10 is a landmark event for the field.
 - "url" must be the real article URL from the research. Never invent one.
 - "source" is the publication name, e.g. "TechCrunch".

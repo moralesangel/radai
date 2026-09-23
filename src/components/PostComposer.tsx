@@ -56,7 +56,7 @@ export function PostComposer({
         </button>
       </div>
 
-      <div className="mb-3 flex gap-2">
+      <div className="mb-3 flex flex-wrap gap-2">
         {TONES.map((t) => (
           <button
             key={t.value}

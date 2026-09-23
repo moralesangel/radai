@@ -1,17 +1,23 @@
 # radai
 
-A single-user React app that surfaces yesterday's AI news and drafts LinkedIn
-posts about it, powered by Claude (web search + structured outputs) and
-Firebase (Cloud Functions + Firestore cache).
+A single-user, mobile-friendly React app that finds the most significant
+recent AI news on demand and drafts LinkedIn posts about it, powered by Claude
+(web search + structured outputs) and Firebase (Cloud Functions + Firestore
+cache).
 
 ## How it works
 
-1. **News discovery** — a Cloud Function calls Claude with the `web_search`
-   server tool to find AI news published on a given date, then makes a second
+1. **News discovery is user-triggered, not scheduled.** Opening the app does
+   nothing by itself — the visitor presses "Search for AI news", which calls a
+   Cloud Function that asks Claude (with the `web_search` server tool) for the
+   most significant AI news from the last 2 days, then makes a second
    structured-outputs call to normalize the results into typed JSON
-   (`{ title, summary, source, url, category, significance }`).
-2. **Caching** — results are cached in Firestore per date, so repeat page
-   loads don't re-run the search. A "Refresh" button forces a re-fetch.
+   (`{ title, summary, source, url, category, significance }`), capped at the
+   8 most significant stories. There's no cron job spending your Anthropic
+   credit on days you don't open the app.
+2. **Caching** — results are cached in Firestore keyed by the visitor's local
+   calendar date, so pressing the button again the same day is free. A
+   "Search again" button forces a real re-fetch.
 3. **LinkedIn drafting** — selecting a story calls a second Cloud Function
    that asks Claude to draft a post in one of three tones. The result is
    editable and copies to the clipboard — nothing is posted to LinkedIn
@@ -42,10 +48,15 @@ API usage; the API needs its own billing at
 [console.anthropic.com](https://console.anthropic.com/settings/billing)).
 
 Each digest fetch makes 2 Claude calls (web search + JSON normalization);
-each LinkedIn post is 1 short call. With `claude-haiku-4-5` ($1/$5 per MTok)
-and one digest fetch per day, expect roughly **$0.50–$1.50/month**. Switching
-`MODEL` to `claude-sonnet-5` or `claude-opus-5` raises quality but multiplies
-cost several times over — check current pricing before switching.
+each LinkedIn post is 1 short call. Web search itself is billed per search
+performed (up to 5 per fetch, though the prompt asks Claude to use 2-4
+normally) on top of token cost. With `claude-haiku-4-5` and one digest fetch
+per day, expect roughly **$2–$4/month** — most of that is the search tool, not
+model tokens, so it doesn't drop much further by changing `MODEL`. Since
+fetching is user-triggered rather than scheduled, days you don't open the app
+cost nothing. Switching `MODEL` to `claude-sonnet-5` or `claude-opus-5` raises
+research/writing quality but adds meaningfully to the token portion of the
+cost — check current pricing before switching.
 
 ## Setup
 
@@ -111,7 +122,8 @@ src/                     React app
     StoryCard.tsx         one news story + "draft post" action
     PostComposer.tsx       tone picker + generated post + copy button
   lib/firebase.ts         Firebase client init + typed callable wrappers
-  App.tsx                 date picker, digest list, post composer
+  lib/errors.ts           turns callable-function errors into readable text
+  App.tsx                 search button, story list, post composer
 
 functions/src/
   claude.ts               Claude calls: web search digest, LinkedIn drafting
@@ -124,10 +136,12 @@ functions/src/
   no dedicated news API. Quality depends on what's indexed and how Claude
   ranks it. If you want a more deterministic source, swap in NewsAPI/GNews/RSS
   and have Claude summarize+rank those results instead of searching cold.
-- **Scheduling:** fetching is on-demand (triggered by loading the page or
-  hitting Refresh). If you want a fresh digest waiting every morning, add a
-  scheduled Cloud Function (`onSchedule`) that calls `fetchDigest` for
-  "yesterday" once a day and writes to Firestore.
+- **Deliberately not scheduled:** an earlier version of this app considered a
+  daily cron (`onSchedule`) to have a digest waiting every morning, but that
+  spends Anthropic credit every day whether or not you actually look at the
+  app. Fetching stays user-triggered by design. If you change your mind,
+  `fetchDigest(dateISO, windowDays, maxStories)` in `functions/src/claude.ts`
+  is ready to be called from a scheduled function instead.
 - **No auth:** anyone with the Hosting URL can use the app and spend your
   Anthropic budget. Fine for personal use; add Firebase Auth + rules if you
   ever share the link.

@@ -51,25 +51,32 @@ const runtime = {
   region: "us-central1",
 };
 
-/** Yesterday in UTC, as YYYY-MM-DD. */
-function yesterdayISO(): string {
-  const d = new Date();
-  d.setUTCDate(d.getUTCDate() - 1);
-  return d.toISOString().slice(0, 10);
+/** Today in UTC, as YYYY-MM-DD. Used only if the client sends no date. */
+function todayUTCISO(): string {
+  return new Date().toISOString().slice(0, 10);
 }
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const WINDOW_DAYS = 2;
+const MAX_STORIES = 8;
 
 /**
- * Returns the AI news digest for a date, fetching it from Claude on a cache
- * miss. Results are cached in Firestore so repeat views cost nothing.
+ * Returns the most significant AI news from the last few days, fetching from
+ * Claude on a cache miss. Results are cached in Firestore keyed by the
+ * caller's local "today" date, so opening the app more than once on the same
+ * day (their time) doesn't re-run the search -- only an explicit refresh does.
+ *
+ * `date` is the caller's local today (YYYY-MM-DD), not a date to search a
+ * single day for -- the search itself always looks back WINDOW_DAYS days from
+ * it. The frontend computes this in the visitor's own timezone; falling back
+ * to server UTC only covers callers that omit it (e.g. direct API calls).
  */
 export const getDigest = onCall(runtime, async (request) => {
   const requested = request.data?.date;
   if (requested !== undefined && !DATE_RE.test(String(requested))) {
     throw new HttpsError("invalid-argument", "date must be YYYY-MM-DD.");
   }
-  const date = requested ? String(requested) : yesterdayISO();
+  const date = requested ? String(requested) : todayUTCISO();
   const refresh = request.data?.refresh === true;
 
   const docRef = db.collection("digests").doc(date);
@@ -83,7 +90,7 @@ export const getDigest = onCall(runtime, async (request) => {
 
   let stories;
   try {
-    stories = await fetchDigest(date);
+    stories = await fetchDigest(date, WINDOW_DAYS, MAX_STORIES);
   } catch (err) {
     console.error("digest fetch failed", { date, err });
     throw new HttpsError("internal", describeClaudeError(err));
