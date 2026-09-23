@@ -98,12 +98,15 @@ export async function fetchDigest(dateISO: string): Promise<Story[]> {
     `Find the most significant artificial intelligence news published on ${dateISO}.
 
 Search the web for AI news from that specific date. Cover model releases, research
-papers, funding rounds, product launches, and AI policy.
+papers, funding rounds, product launches, and AI policy -- but use your searches
+economically: 2-4 well-chosen queries is normally enough to cover these
+categories, so don't spend a search confirming something you're already
+confident about.
 
 For each story report: headline, 2-3 sentence summary, publication name, the URL,
 and why it matters. Only include stories actually published on ${dateISO}. If you
 find fewer than five, report only what you found rather than padding the list.`,
-    8,
+    5,
   );
 
   const parsed = await getClient().messages.parse({
