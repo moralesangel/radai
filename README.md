@@ -59,45 +59,53 @@ cost nothing. Switching `MODEL` to `claude-sonnet-5` or `claude-opus-5` raises
 research/writing quality but adds meaningfully to the token portion of the
 cost — check current pricing before switching.
 
-## Setup
+## Deploy your own copy
 
-### 1. Firebase project
+Anyone can clone this repo and run their own instance — each copy is fully
+independent (own Firebase project, own Anthropic billing, own URL). Nothing
+is shared with the original deployment.
+
+You'll need, before starting:
+
+1. **A Firebase project on the Blaze plan.** Create one free at
+   [console.firebase.google.com](https://console.firebase.google.com) (any
+   name), then upgrade it to **Blaze** under Project settings → Usage and
+   billing. Blaze is pay-as-you-go but includes the same free tier as the
+   Spark plan — a personal instance of this app (a handful of calls a day)
+   is expected to stay within it. It just requires a card on file.
+2. **An Anthropic API key with billing set up** at
+   [console.anthropic.com](https://console.anthropic.com/settings/billing) —
+   this is separate from any claude.ai (Pro/Max) subscription, which does
+   *not* cover API usage. See [Cost](#cost) below for what to expect.
+3. **Node.js 20+** and the Firebase CLI: `npm install -g firebase-tools`,
+   then `firebase login`.
+
+Then, from the cloned repo:
 
 ```bash
-npm install -g firebase-tools
-firebase login
-firebase projects:create   # or use an existing project
+bash scripts/setup.sh
 ```
 
-Put the project ID in `.firebaserc` (replace `YOUR_FIREBASE_PROJECT_ID`).
+This asks for your Firebase project ID, writes your own `.firebaserc` (not
+tracked in git — every clone points at its own project), creates a web app
+in it if needed, writes your `.env` from that app's config, and prompts you
+to paste your Anthropic key (stored in Secret Manager — it never
+enters your `.env` or the git repo). It's interactive and safe to re-run.
 
-Cloud Functions gen 2 requires the **Blaze (pay-as-you-go)** plan — it still
-has a generous free tier, but the plan itself must be upgraded to deploy.
-
-### 2. Frontend env
+Once it finishes:
 
 ```bash
-cp .env.example .env
+npm install && (cd functions && npm install)
+firebase deploy
 ```
 
-Fill in the Firebase web config values from **Project settings → Your apps →
-Web app** in the Firebase console (these are public, not secrets).
+`firebase deploy` builds and deploys the frontend, functions, and Firestore
+rules together (each has its build step wired into `firebase.json`'s
+`predeploy`). It prints your Hosting URL when done — that's your app.
 
-### 3. Anthropic API key
-
-The key is never exposed to the browser — it's read by Cloud Functions from
-Secret Manager:
+### Running it locally instead of deploying
 
 ```bash
-firebase functions:secrets:set ANTHROPIC_API_KEY
-```
-
-### 4. Install and run locally
-
-```bash
-npm install
-cd functions && npm install && cd ..
-
 # Terminal 1: emulate functions + firestore
 cd functions && npm run build && firebase emulators:start --only functions,firestore
 
@@ -106,14 +114,11 @@ echo "VITE_USE_EMULATOR=true" >> .env
 npm run dev
 ```
 
-### 5. Deploy
+### Updating an existing deploy
 
-```bash
-cd functions && npm run build && cd ..
-firebase deploy --only functions,firestore:rules
-npm run build
-firebase deploy --only hosting
-```
+Made code changes and want them live? Just `firebase deploy` again — no need
+to re-run `setup.sh`, which is only for the first-time project link and
+secret.
 
 ## Project structure
 
@@ -143,6 +148,10 @@ functions/src/
   app. Fetching stays user-triggered by design. If you change your mind,
   `fetchDigest(dateISO, windowDays, maxStories)` in `functions/src/claude.ts`
   is ready to be called from a scheduled function instead.
-- **No auth:** anyone with the Hosting URL can use the app and spend your
-  Anthropic budget. Fine for personal use; add Firebase Auth + rules if you
-  ever share the link.
+- **Who can access it — no auth:** there's no login. Anyone who has (or
+  guesses) your Hosting URL — e.g. `https://your-project.web.app` — can open
+  the app and trigger searches on your Anthropic bill, even though the repo
+  itself being public reveals nothing about your specific deployment or its
+  URL. Fine for a personal instance you don't share; add Firebase Auth (and
+  update `firestore.rules`, though Firestore is already locked to Cloud
+  Functions only) if you plan to share the link with anyone else.

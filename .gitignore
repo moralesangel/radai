@@ -22,6 +22,10 @@ ui-debug.log
 functions-debug.log
 pglite-debug.log
 
+# Each deploy points at its own project -- scripts/setup.sh (re)writes this
+# locally. Tracked only as .firebaserc.example, a placeholder.
+.firebaserc
+
 # Editor / OS
 .vscode/*
 !.vscode/extensions.json
