@@ -1,8 +1,10 @@
-import { useState, useCallback } from "react";
-import { getDigest, type Story } from "./lib/firebase";
+import { useState, useCallback, useEffect } from "react";
+import { getDigest, onAuthChange, signOut, type Story } from "./lib/firebase";
 import { describeError } from "./lib/errors";
 import { StoryCard } from "./components/StoryCard";
 import { PostComposer } from "./components/PostComposer";
+import { SignIn } from "./components/SignIn";
+import type { User } from "firebase/auth";
 
 /** Today in the visitor's own timezone, as YYYY-MM-DD (not UTC). */
 function localTodayISO(): string {
@@ -14,11 +16,15 @@ function localTodayISO(): string {
 type Status = "idle" | "loading" | "loaded" | "error";
 
 export default function App() {
+  // undefined = auth state not yet known (initial load); null = signed out.
+  const [user, setUser] = useState<User | null | undefined>(undefined);
   const [status, setStatus] = useState<Status>("idle");
   const [stories, setStories] = useState<Story[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [cached, setCached] = useState(false);
   const [selected, setSelected] = useState<Story | null>(null);
+
+  useEffect(() => onAuthChange(setUser), []);
 
   // Nothing fetches on page load -- searching costs money (Claude web search
   // + tokens), so it only runs when the user explicitly asks for it. A cache
@@ -39,6 +45,14 @@ export default function App() {
     }
   }, []);
 
+  if (user === undefined) {
+    return <div className="min-h-screen bg-slate-50" />;
+  }
+
+  if (user === null) {
+    return <SignIn />;
+  }
+
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="border-b border-slate-200 bg-white">
@@ -48,15 +62,24 @@ export default function App() {
             <p className="text-sm text-slate-500">The most relevant AI news, on demand</p>
           </div>
 
-          {status === "loaded" && (
+          <div className="ml-auto flex shrink-0 items-center gap-2">
+            {status === "loaded" && (
+              <button
+                type="button"
+                onClick={() => void search(true)}
+                className="rounded bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700"
+              >
+                Search again
+              </button>
+            )}
             <button
               type="button"
-              onClick={() => void search(true)}
-              className="ml-auto shrink-0 rounded bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700"
+              onClick={() => void signOut()}
+              className="text-sm text-slate-400 hover:text-slate-600"
             >
-              Search again
+              Sign out
             </button>
-          )}
+          </div>
         </div>
       </header>
 

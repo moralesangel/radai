@@ -1,5 +1,5 @@
-import { onCall, HttpsError } from "firebase-functions/v2/https";
-import { defineSecret } from "firebase-functions/params";
+import { onCall, HttpsError, type CallableRequest } from "firebase-functions/v2/https";
+import { defineSecret, defineString } from "firebase-functions/params";
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import Anthropic from "@anthropic-ai/sdk";
@@ -44,12 +44,35 @@ const db = getFirestore();
 // Read from Secret Manager at runtime; the SDK picks it up via the environment.
 const anthropicApiKey = defineSecret("ANTHROPIC_API_KEY");
 
+// This is the only Google account allowed to use the app -- everyone else's
+// sign-in is accepted by Firebase Auth but rejected here. Set at deploy time,
+// e.g. `firebase functions:config` is legacy; use a .env in functions/ (see
+// README) or override via `--set-params` so each deployer locks it to their
+// own account instead of this repo's.
+const allowedEmail = defineString("ALLOWED_EMAIL");
+
 const runtime = {
   secrets: [anthropicApiKey],
   timeoutSeconds: 540,
   memory: "1GiB" as const,
   region: "us-central1",
 };
+
+/**
+ * Rejects any caller that isn't signed in as the one allowed Google account.
+ * onCall already verifies the Firebase ID token's signature/expiry before
+ * this runs -- request.auth is only ever populated with a genuine token, so
+ * this only needs to check *whose* token it is.
+ */
+function requireOwner(request: CallableRequest): void {
+  const email = request.auth?.token.email;
+  if (!request.auth || !email || email !== allowedEmail.value()) {
+    throw new HttpsError(
+      "permission-denied",
+      "This app is restricted to its owner's Google account.",
+    );
+  }
+}
 
 /** Today in UTC, as YYYY-MM-DD. Used only if the client sends no date. */
 function todayUTCISO(): string {
@@ -72,6 +95,8 @@ const MAX_STORIES = 8;
  * to server UTC only covers callers that omit it (e.g. direct API calls).
  */
 export const getDigest = onCall(runtime, async (request) => {
+  requireOwner(request);
+
   const requested = request.data?.date;
   if (requested !== undefined && !DATE_RE.test(String(requested))) {
     throw new HttpsError("invalid-argument", "date must be YYYY-MM-DD.");
@@ -109,6 +134,8 @@ const TONES: PostTone[] = ["professional", "conversational", "analytical"];
 
 /** Drafts a LinkedIn post for one story and saves it to history. */
 export const createLinkedInPost = onCall(runtime, async (request) => {
+  requireOwner(request);
+
   const parsedStory = StorySchema.safeParse(request.data?.story);
   if (!parsedStory.success) {
     throw new HttpsError("invalid-argument", "A valid story is required.");

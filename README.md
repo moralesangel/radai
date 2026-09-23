@@ -23,10 +23,22 @@ cache).
    editable and copies to the clipboard — nothing is posted to LinkedIn
    automatically (no LinkedIn OAuth is set up).
 
-There is no authentication. This is meant to be run by one person, either
-locally or deployed to a Firebase project only they know the URL of. All
-Firestore access goes through Cloud Functions (Admin SDK); direct client
-reads/writes are denied by `firestore.rules`.
+Only one Google account can use a given deployment — see
+[Access control](#access-control). All Firestore access goes through Cloud
+Functions (Admin SDK); direct client reads/writes are denied by
+`firestore.rules`.
+
+## Access control
+
+The app requires Google Sign-In, but signing in isn't what grants access —
+anyone with a Google account can sign in. What actually gates access is a
+server-side check: both Cloud Functions (`requireOwner` in
+`functions/src/index.ts`) reject every request whose Firebase-verified email
+doesn't match the `ALLOWED_EMAIL` value set at deploy time
+(`functions/.env`, one email per deployment). Sign in as anyone else and
+Firebase Auth succeeds but the functions still return `permission-denied` —
+so a stray link, a public repo, or the Hosting URL leaking doesn't let anyone
+else spend your Anthropic credit.
 
 ## Stack
 
@@ -88,9 +100,13 @@ bash scripts/setup.sh
 
 This asks for your Firebase project ID, writes your own `.firebaserc` (not
 tracked in git — every clone points at its own project), creates a web app
-in it if needed, writes your `.env` from that app's config, and prompts you
-to paste your Anthropic key (stored in Secret Manager — it never
-enters your `.env` or the git repo). It's interactive and safe to re-run.
+in it if needed, writes your `.env` from that app's config, prompts you to
+paste your Anthropic key (stored in Secret Manager — it never enters your
+`.env` or the git repo), asks for the Google account email that should be
+allowed to use the app (written to `functions/.env`, also gitignored), and
+walks you through the one manual step left — enabling the Google sign-in
+provider in the Firebase console, which has no CLI equivalent for a brand
+new project. It's interactive and safe to re-run.
 
 Once it finishes:
 
@@ -127,13 +143,15 @@ src/                     React app
   components/
     StoryCard.tsx         one news story + "draft post" action
     PostComposer.tsx       tone picker + generated post + copy button
-  lib/firebase.ts         Firebase client init + typed callable wrappers
+    SignIn.tsx             Google sign-in screen shown when logged out
+  lib/firebase.ts         Firebase client init, auth helpers, callable wrappers
   lib/errors.ts           turns callable-function errors into readable text
-  App.tsx                 search button, story list, post composer
+  App.tsx                 auth gate, search button, story list, post composer
 
 functions/src/
   claude.ts               Claude calls: web search digest, LinkedIn drafting
-  index.ts                Cloud Functions: getDigest, createLinkedInPost
+  index.ts                Cloud Functions: getDigest, createLinkedInPost,
+                           requireOwner (the ALLOWED_EMAIL check)
 ```
 
 ## Notes / things you may want to change
@@ -148,10 +166,6 @@ functions/src/
   app. Fetching stays user-triggered by design. If you change your mind,
   `fetchDigest(dateISO, windowDays, maxStories)` in `functions/src/claude.ts`
   is ready to be called from a scheduled function instead.
-- **Who can access it — no auth:** there's no login. Anyone who has (or
-  guesses) your Hosting URL — e.g. `https://your-project.web.app` — can open
-  the app and trigger searches on your Anthropic bill, even though the repo
-  itself being public reveals nothing about your specific deployment or its
-  URL. Fine for a personal instance you don't share; add Firebase Auth (and
-  update `firestore.rules`, though Firestore is already locked to Cloud
-  Functions only) if you plan to share the link with anyone else.
+- **Sharing with more than one person:** `ALLOWED_EMAIL` is a single email.
+  To allow a small fixed set of people, change the check in `requireOwner`
+  (`functions/src/index.ts`) to compare against a list instead.

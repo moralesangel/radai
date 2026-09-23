@@ -66,6 +66,23 @@ echo
 firebase functions:secrets:set ANTHROPIC_API_KEY --project "$PROJECT_ID"
 
 echo
+echo "-- Restricting access to your Google account --"
+echo "There's no login screen bypass: this app only works for one Google"
+echo "account, checked server-side on every request."
+read -rp "Your Google account's email (the one you'll sign in with): " OWNER_EMAIL
+[ -n "$OWNER_EMAIL" ] || { echo "An email is required."; exit 1; }
+echo "ALLOWED_EMAIL=$OWNER_EMAIL" > functions/.env
+echo "Wrote functions/.env"
+
+echo
+echo "-- Enable Google Sign-In --"
+echo "One manual step (no full CLI equivalent for first-time setup):"
+echo "  1. Open https://console.firebase.google.com/project/$PROJECT_ID/authentication"
+echo "  2. Click 'Get started' if this is the project's first auth provider"
+echo "  3. Enable the 'Google' sign-in provider and save"
+read -rp "Press Enter once you've done that... " _
+
+echo
 echo "== Setup complete. Next: =="
 echo "  npm install && (cd functions && npm install)"
 echo "  npm run build && (cd functions && npm run build)"

@@ -1,4 +1,13 @@
 import { initializeApp } from "firebase/app";
+import {
+  getAuth,
+  connectAuthEmulator,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signOut as firebaseSignOut,
+  onAuthStateChanged,
+  type User,
+} from "firebase/auth";
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from "firebase/functions";
 
 // These values are not secrets. Firebase web config is public by design; access
@@ -14,9 +23,29 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const functions = getFunctions(app, "us-central1");
+const auth = getAuth(app);
 
 if (import.meta.env.VITE_USE_EMULATOR === "true") {
   connectFunctionsEmulator(functions, "127.0.0.1", 5001);
+  connectAuthEmulator(auth, "http://127.0.0.1:9099");
+}
+
+// Sign-in is Google-only. It doesn't decide *who* is allowed to use the app --
+// anyone with a Google account can sign in here -- the Cloud Functions
+// (requireOwner in functions/src/index.ts) are what actually reject every
+// account except the one configured via ALLOWED_EMAIL.
+const googleProvider = new GoogleAuthProvider();
+
+export function signInWithGoogle(): Promise<unknown> {
+  return signInWithPopup(auth, googleProvider);
+}
+
+export function signOut(): Promise<void> {
+  return firebaseSignOut(auth);
+}
+
+export function onAuthChange(callback: (user: User | null) => void): () => void {
+  return onAuthStateChanged(auth, callback);
 }
 
 export type Story = {

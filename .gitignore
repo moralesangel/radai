@@ -12,6 +12,7 @@ functions/lib/
 .env.*.local
 functions/.env
 functions/.env.*
+!functions/.env.example
 *.local
 
 # Firebase
